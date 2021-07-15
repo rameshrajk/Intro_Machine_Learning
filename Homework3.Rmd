@@ -1,0 +1,100 @@
+---
+title: "Homework 3"
+author: "Ramesh Kanakala"
+subtitle: "This is an R script with the purpose of running logistic regression on graduate admissions data from and Indian graduate school to get acceptance probabilities"
+output: html_notebook
+---
+
+### Step 1
+```{r}
+#load the data and look at the first few rows
+adm <- read.csv(file = 'Admission_Predict.csv')
+head(adm)
+```
+
+### Step 2
+```{r}
+#a. making Research a factor
+adm$Research <- as.factor(adm$Research)
+#b. getting rid of the Serial No column
+adm <- subset(adm, select = -Serial.No.)
+#c. new Chance.of.Admit > 0.5 binary column: Admit.Factor
+adm$Admit.Factor <- as.factor(ifelse(adm$Chance.of.Admit>0.5, 1, 0))
+#d. output column names
+names(adm)
+#e. output a summary of the data
+summary(adm)
+```
+f. Of the 400 observations in the data set, approximately only 8.75% (35) are classified as not having a chance for admission and 91.25% (365) do; I would consider this very unbalanced due to the uneven ratio.
+
+### Step 3
+```{r, warning=FALSE}
+#plotting Admit.Factor against GRE and TOEFL scores
+par(mfrow=c(1,2))
+plot(adm$Admit.Factor, adm$GRE.Score, xlab = "Admit (1 is prob. > 0.5)", ylab="GRE Score", main="Admit vs GRE Score", varwidth = TRUE)
+plot(adm$Admit.Factor, adm$TOEFL.Score, xlab = "Admit (1 is prob. > 0.5)", ylab="TOEFL Score", main="Admit vs TOEFL Score", varwidth = TRUE)
+```
+Using the parameter varwidth = TRUE allows us to make the boxplot widths proportional to the square root of the sample sizes; in this case we can see that Admit 1 (change greater than 0.5 to be admitted) is more common than Admit 0 for both graphs. More importantly, we see that Admit 1 observations are associated with much higher GRE and TOEFL scores.
+
+### Step 4
+```{r}
+#dividing into train/test, putting 75% in train
+set.seed(1234)
+i <- sample(1:nrow(adm), nrow(adm)*0.75, replace=FALSE)
+train <- adm[i,]
+test <- adm[-i,]
+```
+
+### Step 5
+```{r}
+#trying to build model predicting Admit.Factor from all predictors
+glm1 <- glm(Admit.Factor~., family = "binomial", data = train)
+```
+Received a couple warnings because the training data is nearly perfectly linearly separable; the data is too easy to classify as it is separated too perfectly.
+
+### Step 6
+```{r}
+#building another model with all predictors except Chance.of.Admit
+glm2 <- glm(Admit.Factor~.-Chance.of.Admit, family = "binomial", data = train)
+```
+
+### Step 7
+```{r}
+#predict on test data
+probs <- predict(glm2, newdata=test, type="response")
+head(probs)
+head(test$Chance.of.Admit)
+cor(probs, test$Chance.of.Admit)
+```
+The correlation between the predicted probabilities and test chances of admission is 0.648545; I would consider this neither high or low but rather a moderate positive relationship. There is a positive relationship between the predicted and actual values but it isn't super strong.
+### Step 8
+```{r}
+#binary predictions, output a table of predictions
+pred <- ifelse(probs>0.5, 1, 0)
+table(pred, test$Admit.Factor)
+acc <- mean(pred==test$Admit.Factor)
+print(paste("glm2 accuracy = ", acc))
+```
+
+### Step 9
+```{r}
+#ROCR graph and the AUC
+library(ROCR)
+pr <- prediction(probs, test$Admit.Factor)
+# TPR = sensitivity, FPR=specificity
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+# compute AUC
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+print(paste("AUC = ", auc))
+```
+
+### Step 10
+```{r}
+#plotting AdmitXSOP, ResearchXSOP
+par(mfrow=c(1,2))
+plot(adm$Admit.Factor, adm$SOP, xlab = "Admit (1 is prob. > 0.5)", ylab="SOP", main="Admit vs SOP", varwidth = TRUE)
+plot(adm$Research, adm$SOP, xlab = "Research", ylab="SOP", main="Research vs SOP", varwidth = TRUE)
+```
+Observing the widths of the boxplots (varwidth is set to TRUE), we can see that an admittance probability greater than 0.5 is more common than not. In the Research vs SOP graph, however, we the widths are quite similar so they are quite close in sample size. With the first graph we also see that admittance chance greater than 0.5 is associated with a much higher statement of purpose/recommendation letter strength. We see something similar with the second graph; those who have research experience are associated with stronger SOPs, though more slight of a difference.

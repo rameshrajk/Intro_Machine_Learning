@@ -1,0 +1,115 @@
+---
+title: "Homework 5"
+author: "Ramesh Kanakala"
+subtitle: "This is an R script with the purpose ofcomparing kNN performance to linear regression and logistic regression"
+output: html_notebook
+---
+### PROBLEM 1
+
+### Step 1
+```{r}
+#load ISLR and divide Auto into train and test
+library(ISLR)
+data(Auto)
+set.seed(1234)
+i <- sample(1:nrow(Auto), nrow(Auto)*0.75,
+replace=FALSE)
+train <- Auto[i,]
+test <- Auto[-i,]
+```
+
+### Step 2
+```{r}
+#build linear regression, look at summary and residual plots
+lm1 <- lm(mpg~cylinders+displacement+horsepower, data=train)
+summary(lm1)
+par(mfrow=c(2,2))
+plot(lm1)
+```
+
+### Step 3
+```{r}
+#evaluate model on test data and output corr and mse
+pred <- predict(lm1, newdata=test)
+correlation <- cor(pred, test$mpg)
+print(paste("correlation: ", correlation))
+mse <- mean((pred - test$mpg)^2)
+print(paste("mse: ", mse))
+```
+
+### Step 4
+```{r}
+#kNN regresssion and output corr and mse
+library(caret)
+fit <- knnreg(train[,2:4],train[,1], k=1)
+pred1 <- predict(fit, test[,2:4])
+correlation <- cor(pred1, test$mpg)
+print(paste("correlation: ", correlation))
+mse <- mean((pred1 - test$mpg)^2)
+print(paste("mse: ", mse))
+```
+
+### Step 5
+a. kNN regression has a higher correlation than linear regression when predicting for mpg: 0.844 > 0.806
+b. kNN had a lower mse than linear regression: 18.961 < 21.758
+c. The mse metric decreased meaning there is less error whereas the correlation increased meaning there is a stronger positive relationship between mpg and the predictors here
+d. kNN has low bias with the small value of k whereas linear regression has high bias; linear regression is more likely to underfit and not capture the true shape of the data. On the other hand, kNN regression makes no assumptions about the data as it doesn't focus on building a model rather it looks at the cluster of neighbors around test instances. 
+
+### PROBLEM 2
+
+### Step 1
+```{r}
+#load mlbench and divide BreastCancer into train and test
+library(mlbench)
+data(BreastCancer)
+BreastCancer$Cell.small <- as.factor(ifelse(BreastCancer$Cell.size==1, 1, 0))
+BreastCancer$Cell.regular <- as.factor(ifelse(BreastCancer$Cell.shape==1, 1, 0))
+set.seed(1234)
+i <- sample(1:nrow(BreastCancer), nrow(BreastCancer)*0.75,
+replace=FALSE)
+train1 <- BreastCancer[i,]
+test1 <- BreastCancer[-i,]
+train_labels <- BreastCancer[i, 11]
+test_labels <- BreastCancer[-i, 11]
+```
+
+### Step 2
+```{r}
+#build logistic regression, look at summary and residual plots
+glm1 <- glm(Class~Cell.small+Cell.regular, family = "binomial", data = train1)
+summary(glm1)
+```
+
+### Step 3
+```{r}
+#evaluate model on test data and output accuracy and confusion matrix
+library(e1071)
+probs <- predict(glm1, newdata=test1, type="response")
+pred2 <- ifelse(probs>0.5, 2, 1)
+acc <- mean(pred2==as.integer(test1$Class))
+acc
+library(caret) 
+confusionMatrix(as.factor(pred2), as.factor(as.integer(test1$Class)))
+```
+
+### Step 4
+```{r}
+#use knn() and output accuracy and confusion matrix
+library(class)
+class_pred <- knn(train1[,12:13], test1[,12:13], cl=train_labels, k=1)
+acc <- length(which(class_pred == test_labels)) / length(class_pred)
+acc
+confusionMatrix(as.factor(class_pred), test1$Class)
+```
+### Step 5
+```{r}
+#kNN using predictor columns 2-6, 8-10 and output accuracy and a table
+library(class)
+class_pred1 <- knn(train1[,c(2:6, 8:10)], test1[,c(2:6, 8:10)], cl=train_labels, k=1)
+acc <- length(which(class_pred1 == test_labels)) / length(class_pred1)
+acc
+confusionMatrix(as.factor(class_pred1), test1$Class)
+```
+### Step 6
+a. Logistic regression and the first kNN algorithm had the same accuracy, 0.8914. This may be due to the fact that they share the same predictors here, cell small and cell regular. The second kNN algorithm has a greater accuracy, 0.9143, and this is most likely because it uses more predictors.
+b. This accuracy for the last kNN algorithm, 0.9143, is the greatest we've seen for the BreastCancer Class classification. Homework 4's glm1 has an accuracy of 0.8987 and the naive bayes has 0.8987. kNN performs better here for perhaps two reasons. One, it utilizes more predictors that may provide more insight into neighbors around test instances. Second, kNN is a non-parametric approach so it doesn't assume the shape of the distribution like logistic regression or naive-bayes.

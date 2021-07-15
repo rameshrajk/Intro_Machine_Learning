@@ -1,0 +1,128 @@
+---
+title: "CV Homework 7"
+author: "Ramesh Kanakala"
+subtitle: "This is an R script with the purpose of comparing various ensemble methods on a day-trading data set"
+output:
+  html_notebook: default
+---
+
+### Loading and Cleaning Classification Data (https://www.kaggle.com/dawerty/cleaned-daytrading-training-data)
+```{r}
+#load the data
+st <- read.csv("stock.csv")
+st <- subset(st, select = -c(sym, datetime))
+
+#converting to binary
+st$is_profit <- as.integer(as.factor(st$is_profit)) - 1
+st$is_profit <- as.factor(st$is_profit)
+
+#divide train and test
+set.seed(1234)
+i <- sample(1:nrow(st), nrow(st)*0.75, replace=FALSE)
+train <- st[i,]
+test <- st[-i,]
+```
+
+### Random Forest
+```{r}
+library(randomForest)
+memory.limit(20000)
+start <- Sys.time() 
+rf1 <- randomForest(is_profit~., data=train, importance=TRUE)
+#rf1 <- randomForest(x = train[,2:21], y = train$is_profit, training_frame = train)
+end <- Sys.time() 
+start - end
+
+summary(rf1)
+pred1 <- predict(rf1, newdata=test, type="response")
+acc_rf <- mean(pred1==test$is_profit)
+mcc_rf <- mcc(factor(pred1), test$is_profit)
+print(paste("accuracy=", acc_rf))
+print(paste("mcc=", mcc_rf))
+```
+
+### Boosting (adaboost from adabag)
+```{r}
+library(adabag)
+library(mltools)
+start <- Sys.time() 
+adab1 <- boosting(is_profit~., data=train, boos=TRUE, mfinal=20, coeflearn="Breiman")
+end <- Sys.time() 
+start - end
+
+summary(adab1)
+pred2 <- predict(adab1, newdata=test, type="response")
+acc_adabag <- mean(pred2$class==test$is_profit)
+mcc_adabag <- mcc(factor(pred2$class), test$is_profit)
+print(paste("accuracy=", acc_adabag))
+print(paste("mcc=", mcc_adabag))
+```
+
+### AdaBoost (from fastAdaboost)
+```{r}
+library(fastAdaboost)
+start <- Sys.time() 
+fadab1 <- adaboost(is_profit~., train, 10)
+end <- Sys.time() 
+start - end
+
+summary(fadab1)
+pred3 <- predict(fadab1, newdata=test, type="response")
+acc_fadab <- mean(pred3$class==test$is_profit)
+mcc_fadab <- mcc(pred3$class, test$is_profit)
+print(paste("accuracy=", acc_fadab))
+print(paste("mcc=", mcc_fadab))
+```
+
+### XGBoost
+```{r}
+train_label <- ifelse(train$is_profit==1, 1, 0)
+train_matrix <- data.matrix(train[, -1])
+test_label <- ifelse(test$is_profit==1, 1, 0)
+test_matrix <- data.matrix(test[, -1])
+
+
+library(xgboost)
+start <- Sys.time() 
+xgb1 <- xgboost(data=train_matrix, label=train_label, nrounds=100, objective="binary:logistic", verbose  = 0)
+end <- Sys.time() 
+start - end
+probs <- predict(xgb1, test_matrix)
+pred4 <- ifelse(probs>0.5, 1, 0)
+acc_xg <- mean(pred4==test_label)
+mcc_xg <- mcc(pred4, test_label)
+print(paste("accuracy=", acc_xg))
+print(paste("mcc=", mcc_xg))
+```
+
+### Original Project Models for comparison
+```{r}
+#logistic regression model
+glm1 <- glm(is_profit~., data=train, family=binomial)
+probs <- predict(glm1, newdata=test, type="response")
+glmpred <- ifelse(probs>0.5, 1, 0)
+glmacc <- mean(glmpred==test$is_profit)
+print(paste("acc: ", glmacc))
+
+#naive bayes model
+library(e1071)
+nb1 <- naiveBayes(is_profit~., data=train)
+nbpred <- predict(nb1, newdata=test, type="class")
+library(caret)
+nbacc <- mean(nbpred==test$is_profit)
+print(paste("acc: ", nbacc))
+
+#decision tree model
+library(tree)
+tree2 <- tree(is_profit~., data=train)
+tree_pred2 <- predict(tree2, newdata=test, type="class")
+treeacc <- mean(tree_pred2 == test$is_profit)
+print(paste("acc: ", treeacc))
+```
+
+### Discussion
+The accuracies of the original algorithms of the project, logistic regression, naive bayes, and a decision tree, were 0.695, 0.683, and 0.678 respectively. Logistic regression performed the best and the decision tree the worst. The ensemble methods used in this notebook all improved upon the highest accuracy, 0.695 by logistic regression. Here are the model ranked by accuracy: random forest (0.702), xgboost (0.697), adaboost (0.695), and fastadaboost (0.654). The mccs are also ranked the same. Random forest, though it had the highest accuracy, ran the second-longest at 10.954 minutes, adaboost was highest at 11.3259 minutes, and fastadaboost and xgboost followed both much fast at 4.721 minutes and 6.266878 seconds respectively. It's interesting how xgboost was had the second highest accuracy but ran much over a hundred times faster than the random forest. Fast adaboost was worse than adaboost in accuracy but faster in time.
+
+Random foresting most likely took the a long time as it trains multiple trees on subsets of the data and chose the best model after trying many of them but this also probably led to it's success. Fastadaboost uses C++ code to run about 100 times fast than adaboost, though in this case it was more about 1.3x faster, and interestingly received a slightly lower accuracy. Finally, XGBoost is known for its extreme scalability and ran faster by a huge margin. This is done because the C++ computation utilizes multithreading processing. Of course, the data had to be preprocessed before, however.
+
+

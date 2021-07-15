@@ -1,0 +1,153 @@
+---
+title: "Homework 4"
+author: "Ramesh Kanakala"
+subtitle: "This is an R script with the purpose of running logistic regression and naive bayes on the mlbench BeastCancer dataset"
+output: html_notebook
+---
+
+### Step 1
+```{r}
+#load mlbench and take a look at BreastCancer
+library(mlbench)
+data(BreastCancer)
+str(BreastCancer)
+head(BreastCancer)
+summary(BreastCancer$Class)
+#percent of each class
+classsum <- summary(BreastCancer$Class)
+ben <- classsum[[1]]/sum(classsum)
+mal <- classsum[[2]]/sum(classsum)
+print(paste("Benign % = ", ben))
+print(paste("Malignant % = ", mal))
+```
+a. There are 699 instances in the BreastCancer data set
+b. The target column is class: whether the instance is benign or malignant
+c. There are 10 predictors, all with either an ordinal or factor data type
+d. 34.48% of the observations are malignant
+
+### Step 2
+```{r}
+#load mlbench and take a look at BreastCancer
+glm0 <- glm(Class~Cell.size+Cell.shape, family = "binomial", data = BreastCancer)
+summary(glm0)
+```
+Running summary on glm0 we see that a model was really built. The error (glm.fit: fitted probabilities numerically 0 or 1 occurred) usually occurs when one of the independent variables differentiate the dependent perfectly well. One way to fix this is to find which instances/outliers are causing perfect separation and to remove them from the sample.
+
+Source: https://stats.stackexchange.com/questions/396008/glm-fit-fitted-probabilities-numerically-0-or-1-occurred-however-culprit-featur
+
+### Step 3
+```{r}
+#adding Cell.small and Cell.regular columns
+BreastCancer$Cell.small <- as.factor(ifelse(BreastCancer$Cell.size==1, 1, 0))
+BreastCancer$Cell.regular <- as.factor(ifelse(BreastCancer$Cell.shape==1, 1, 0))
+summary(BreastCancer$Cell.size)
+summary(BreastCancer$Cell.shape)
+summary(BreastCancer$Cell.small)
+summary(BreastCancer$Cell.regular)
+```
+The new columns are more evenly distributed, or balanced, compared to all of the levels before; I believe creating these new binary columns were a good idea as a balanced data set usually means there are less problems for classification algorithms and greater accuracy.
+
+### Step 4
+```{r}
+#conditional density plots with Cell.size and Cell.shape
+attach(BreastCancer)
+par(mfrow=c(1,2))
+cdplot(y = Class, x = Cell.size)
+cdplot(y = Class, x = Cell.shape)
+```
+We can see for both size and malignant as well as shape and malignant the areas are very similar in size and shape. I think our cutoff points of 1 for both size and shape were justified as we can see the conditional density areas vary sharply from 1.
+
+### Step 5
+```{r}
+#plots with new columns
+par(mfrow=c(1,2))
+plot(y = Class, x = Cell.small, xlab = "Cell Small Factor", ylab = "Cell Class")
+plot(y = Class, x = Cell.regular, xlab = "Cell Regular Factor", ylab = "Cell Class")
+cdplot(y = Class, x = Cell.small)
+cdplot(y = Class, x = Cell.regular)
+sum(Class=='malignant' & Cell.small==1)/nrow(BreastCancer)
+sum(Class=='malignant' & Cell.small==0)/nrow(BreastCancer)
+sum(Class=='malignant' & Cell.regular==1)/nrow(BreastCancer)
+sum(Class=='malignant' & Cell.regular==0)/nrow(BreastCancer)
+```
+The conditional plots really exemplify the stark difference of malignancy from a small or not cell and a regular or not cell; both plots and cdplots have most of the data in level 0. The areas for both graph are very close. We see malignancy is more associated with not small and not regular both with the plots as well as the percentages; there is a great difference of the not small and not regular cells being malignant.
+
+### Step 6
+```{r}
+#divide BreastCancer into two data sets
+set.seed(1234)
+i <- sample(1:nrow(BreastCancer), nrow(ChickWeight)*0.8,
+replace=FALSE)
+train <- BreastCancer[i,]
+test <- BreastCancer[-i,]
+```
+
+### Step 7
+```{r}
+#logistic regression classifier for Class given Cell.small and Cell.regular
+glm1 <- glm(Class~Cell.small+Cell.regular, data=train, family=binomial)
+summary(glm1)
+```
+a. Both Cell small and regular seem to be g ood predictors as the have very low p-values.
+b. The deviance dropped greatly from null to residual meaning that the predictors are good predictors.
+c. An AIC by itself is not very useful but comparing it to the previous model, it decreased meaning that this model is better.
+
+### Step 8
+```{r}
+#test the model on the test data and compute accuracy
+library(e1071)
+probs <- predict(glm1, newdata=test, type="response")
+pred1 <- ifelse(probs>0.5, 'malignant', 'benign')
+acc <- mean(pred1==test$Class)
+acc
+library(caret) 
+confusionMatrix(as.factor(pred1), test$Class)
+```
+The model has an accuracy of 0.8987342. There were more false negatives than false positives (21 > 3).
+
+### Step 9
+```{r}
+#coefficients
+glm1$coefficients[]
+smallodds <- exp(glm1$coefficients[2])
+smallprob <- (smallodds)/(1 + smallodds)
+smallprob
+sum(Class=='malignant' & Cell.small==1)/nrow(BreastCancer)
+```
+a. The coefficient for cell small is -5.303822 and for cell regular -4.159019 
+b. The coefficents are in log odds which means that for a unit increase in in small and regular, the class decreases by log odds of -5.303822 and -4.159019
+c. The estimated probability of malignant if Cell.small is true is 0.004947947
+d. The probability of malignant if Cell.small is true is 0.005722461. It is very close to the estimated probability but a little less; the estimation works with a smaller part of the data, the train set, but the calculated probability is with the entire set of data which may be why it is slightly different but very close. 
+
+### Step 10
+```{r}
+#two more models using just small or regular
+glm_small <- glm(Class~Cell.small, data=train, family=binomial)
+glm_regular <- glm(Class~Cell.regular, data=train, family=binomial)
+anova(glm_small, glm_regular, glm1)
+summary(glm_small)
+summary(glm_regular)
+```
+Taking a look at the anova, we see that that model 3 has the lowest residual deviance suggesting that combining both variables improves the model. Looking at the AIC scores from the model summaries for each model, we see that glm1 has the lowest here as well; glm1 has the better combination of predictors. Out of the other two, glm_small has a lower AIC than glm_regular suggesting that glm_small is the second best here.
+
+### Step 11
+```{r}
+#naive bayes model with small and regular
+library(e1071)
+nb1 <- naiveBayes(Class~Cell.small+Cell.regular , data=train)
+nb1
+summary(nb1)
+```
+a. 64.29% of the training data is benign
+b. The likelihood a malignant sample is not small is 0.993939394 
+c. The likelihood a malignant sample is not regular is 0.993939394
+
+### Step 12
+```{r}
+#predict with naive bayes model
+pred2 <- predict(nb1, newdata=test, type="class")
+acc <- mean(pred2==test$Class)
+acc 
+confusionMatrix(pred2, test$Class) 
+```
+The accuracy and confusion matrix output is the same as the logistic regression model with the naive bayes model. This may be because the class frequencies of malignant and benign are somewhat unbalanced with almost 64% being malignant leading to the classifiers reaching close accuracies. Essentially, the models classify very similarly based on the two shared predictors.

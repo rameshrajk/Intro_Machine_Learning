@@ -1,0 +1,151 @@
+---
+title: "Homework 2"
+author: "Ramesh Kanakala"
+output: html_notebook
+---
+### PROBLEM 1
+### Step 1
+```{r}
+#load ISLR and take a look at Auto
+library(ISLR)
+names(Auto)
+summary(Auto)
+#divide data randomly into train and test sets 75/25
+set.seed(1234)
+i <- sample(1:nrow(Auto), nrow(Auto)*0.75,
+replace=FALSE)
+train <- Auto[i,]
+test <- Auto[-i,]
+```
+### Step 2
+```{r}
+#simple linear regression on the train data with mpg as the response and horsepower as the predictor
+lm1 <- lm(mpg~horsepower, data=train)
+summary(lm1)
+#mse
+pred <- predict(lm1, newdata=train)
+mse <- mean((pred - train$mpg)^2)
+mse
+rmse <- sqrt(mse)
+rmse
+```
+### Step 3
+a. 39.648595-.15681x
+b. As the p-value is very small so we can reject the null hypothesis that there is no relationship between horsepower and mpg. Also, the F-statistic is far from 0, and it's p-value very low, meaning that horsepower and mpg are strongly related.
+c. Negative correlation
+d.An RSE of 4.853 means the average error of the model was about 4.853 mpg, which I believe is not good in this context as mpg has a range from 9 to 46 and almost 5 units is a big difference. The adjusted R^2 is .6123 which means 61% of the variance in mpg can be explained by our predictor; it's not bad but is not great either. And again, the F-statistic, of 463.7, is far from 0 with a very low associated p-value, meaning that horsepower and mpg are strongly related.
+e. The MSE by itself is hard to interpret in isolation but when I square it, it is approximately 5 (exactly 4.836502), meaning that it was off by about 5 mpg on average, very similar to the RSE. Not too bad but not good.
+
+### Step 4
+```{r}
+plot(train$horsepower, train$mpg, pch=20, col="black",
+main="Horsepower vs. MPG", xlab="Horsepower", ylab="MPG")
+abline(lm1, lty=5, lwd=2, col='blue')
+#predict 98
+pred98 <- predict(lm1, data.frame(horsepower=98))
+pred98
+```
+The predicted value of 24.29381 for 98 horsepower certainly seems in line with the plot between horsepower and mpg; 98 is very close to 100, and even though the cluster of data points around horsepower that is slightly less than 100 is somewhat spread around, the middle is between 20 and 30 mpg and looking closer we can see it is very slightly centered below 25.
+
+### Step 5
+```{r}
+#test on test data
+pred <- predict(lm1, newdata=test)
+cor1 <- cor(pred, test$mpg)
+cor1
+mse <- mean((pred - test$mpg)^2)
+mse
+rmse <- sqrt(mse)
+rmse
+```
+A correlation of 0.7642101 is quite good and means that there is decently strong positive correlation between predicted values and test values of mpg. Again, MSE by itself is hard to interpret but square rooting it and looking at the RMSE tells us that our test data was off about 5.071219 mpg on average. Compared to the MSE of the training data (23.39176) this MSE of 25.71727 is a little higher and this makes sense because the model was fitted to the train data but the test data us slightly different, leading to more error.   
+
+### Step 6
+```{r}
+#residual plots
+par(mfrow=c(2,2))
+plot(lm1)
+```
+In the first graph, the line is quite straight but isn't all the way horizontal, instead is curving upward at the beginning and end. The residuals have some variation at the beginning but vary more at the end, meaning that as horsepower increases, mpg can vary greatly. The second graph is a fairly straight diagonal line meaning the residuals are normally distributed except, again, at the beginning and mostly the end; there is variation that the model does not capture. Graph 3 has primarily straight line but we see that the residual points vary greatly at the end. Finally, the fourth graph has a line that picks up at the end as well as great variance at the beginning suggesting there are leverage points at those areas. Overall, though it seems primarily normally distributed, I do see some evidence of non-linearity especially in the ends of data
+
+### Step 7
+```{r}
+#linear model with log(mpg) as target
+lm2 <- lm(log(mpg)~horsepower, data=train)
+summary(lm2)
+```
+The Adjusted R^2 of the second model is higher (0.6965 > 0.6123) meaning that the variance is better explained by horsepower when mpg is logged.
+
+### Step 8
+```{r}
+#plot abline for second model where target is log(mpg)
+plot(train$horsepower, log(train$mpg), pch=20, col="black",
+main="Horsepower vs. log(mpg)", xlab="Horsepower", ylab="log(mpg)")
+abline(lm2, lty=5, lwd=3, col='red')
+```
+Using the log function damped down the x values across the axis bringing the mpg values closer to the linear regression line; this line fits the data much better, or closer, than the first model.
+
+### Step 9
+```{r}
+#test on test data with lm2
+pred2 <- exp(predict(lm2, newdata=test))
+cor1 <- cor(pred2, log(test$mpg))
+cor1
+mse <- mean((pred2 - test$mpg)^2)
+mse
+```
+A correlation is higher now (0.814936 > 0.7642101) meaning that there is a stronger positive correlation between predicted values and and the log of the test values of mpg. The MSE decreased greatly from 25.71727 to 22.49848 meaning the test data was less off than before.
+
+### Step 10
+```{r}
+#residual plots for lm2
+par(mfrow=c(2,2))
+plot(lm2)
+```
+The second linear model has less variance than model 1 which we can see easily in graphs 1, 3, and 4 with the data points much closer to the horizontal line. There are also less potential outliers and leverage points which we can see with less points being pointed out in these graphs.
+
+### PROBLEM 2
+### Step 1
+```{r}
+#a scatterplot matrix for Auto
+pairs(Auto)
+```
+There are positive correlations for horsepower vs displacement, weight vs horsepower, and weight vs displacement. There also seems to be a weaker positive correlation between year and mpg. There are negative correlations for displacement vs mpg, horsepower vs mpg, weight vs mpg, acceleration vs displacement, and acceleration vs horsepower. There seems to be a weaker negative correlation with acceleration and weight.
+
+### Step 2
+```{r}
+#matrix of correlations (minus "name")
+Auto$origin <- as.numeric(Auto$origin) #needed this here as we make origin a factor in the next step
+cor(Auto[-which(names(Auto) == "name")])
+```
+Two strongest positive correlations: displacementXcylinders (0.9508233), displacementXweight (0.9329944)
+
+Two strongest negative correlations: mpgXweight (-0.8322442), mpgXhorsepower (-0.7784268)
+
+### Step 3
+```{r}
+#multiple linear regression with mpg as the response and all other variables except name as predictors
+Auto$origin <- as.factor(Auto$origin)
+lm3 <- lm(mpg~cylinders+displacement+horsepower+weight+acceleration+year+origin, data=train)
+summary(lm3)
+```
+Weight, year, and origin appear to have the most statistically significant relationship to the response as they have the lower p-values.
+
+### Step 4
+```{r}
+#diagnostic plots of lm3
+par(mfrow=c(2,2))
+plot(lm3)
+Auto[327,]
+```
+The residuals don't appear to be evenly distributed in plot 1 as they vary at the end. The residuals go off the line in the second Q-Q plot at the beginning and the end. The third plot is similar to plot 1 as the residuals aren't spread equally along the ranges especially at the end. Finally in the fourth plot indicates a few leverage points that may are influencing the regression line. I have plotted one of them (327)
+
+### Step 5
+```{r}
+#diagnostic plots of lm3
+lm4 <- lm(mpg~cylinders*displacement+weight*displacement+weight+year+origin, data=train)
+summary(lm4)
+#compare lm3 and lm4
+anova(lm3, lm4)
+```
+I chose cylinderXdisplacement and weightXdisplacement as they high correlations and then I added wight, year, and origin as they were statistically significant. This model has a better adjusted R^2 (0.8547 > 0.8288) meaning it is a better model of the data. The new model also has less RSE and a greater F-statistic with a small p-value meaning it is more statistically sigificant as well. The anova() function shows that the new model outperformed the last as model 2 has a lower RSS.

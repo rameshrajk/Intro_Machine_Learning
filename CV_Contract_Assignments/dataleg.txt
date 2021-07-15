@@ -1,0 +1,8 @@
+HW1: Traffic
+HW2: Wage
+HW3: Dress Sales (Aliexpress)
+HW4: Abalone
+HW5: Wage
+HW7: Day-Trading
+HW8: Wine Quality
+HW9: Day-Trading

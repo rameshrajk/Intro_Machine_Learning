@@ -1,0 +1,119 @@
+---
+title: "Homework 7"
+author: "Ramesh Kanakala"
+subtitle: This is an R script with the purpose of comparing various ensemble methods
+  on a hotel data set
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+### Loading and Cleaning Classification Data from Project 2
+```{r}
+#load the data
+hb <- read.csv("hotel_bookings.csv")
+attach(hb)
+
+#data cleaning: dropping unnecessary numerical columns
+hb <- subset(hb, select = -c(arrival_date_year, arrival_date_day_of_month, booking_changes, days_in_waiting_list, agent, company))
+#data cleaning: dropping unnecessary categorical columns
+hb <- subset(hb, select = -c(country, assigned_room_type, reservation_status, reservation_status_date))
+#cleaning: changing variable data types 
+hb$hotel <- as.factor(hb$hotel)
+hb$is_canceled <- as.factor(hb$is_canceled)
+hb$meal <- as.factor(hb$meal)
+hb$market_segment <- as.factor(hb$market_segment)
+hb$distribution_channel <- as.factor(hb$distribution_channel)
+hb$is_repeated_guest  <- as.factor(hb$is_repeated_guest )
+hb$reserved_room_type <- as.factor(hb$reserved_room_type)
+hb$deposit_type <- as.factor(hb$deposit_type)
+hb$customer_type <- as.factor(hb$customer_type)
+hb$adr[hb$adr==5400] <- 540
+
+#cleaning: dealing with missing values and obs with no guests
+hb$children[is.na(hb$children)] <- 0
+hb <- hb[ which((hb$adults + hb$children + hb$babies)!=0), ] #double check
+
+#divide train and test
+set.seed(1234)
+i <- sample(1:nrow(hb), nrow(hb)*0.75, replace=FALSE)
+train <- hb[i,]
+test <- hb[-i,]
+```
+
+### Random Forest
+```{r}
+library(randomForest)
+start <- Sys.time() 
+rf1 <- randomForest(is_canceled~., data=train, importance=TRUE)
+end <- Sys.time() 
+start - end
+
+summary(adab1)
+pred1 <- predict(rf1, newdata=test, type="response")
+acc_rf <- mean(pred1==test$is_canceled)
+mcc_rf <- mcc(factor(pred), test$is_canceled)
+print(paste("accuracy=", acc_rf))
+print(paste("mcc=", mcc_rf))
+```
+
+### Boosting (adaboost from adabag)
+```{r}
+library(adabag)
+library(mltools)
+start <- Sys.time() 
+adab1 <- boosting(is_canceled~., data=train, boos=TRUE, mfinal=20, coeflearn="Breiman")
+end <- Sys.time() 
+start - end
+
+summary(adab1)
+pred2 <- predict(adab1, newdata=test, type="response")
+acc_adabag <- mean(pred2$class==test$is_canceled)
+mcc_adabag <- mcc(factor(pred2$class), test$is_canceled)
+print(paste("accuracy=", acc_adabag))
+print(paste("mcc=", mcc_adabag))
+```
+
+### AdaBoost (from fastAdaboost)
+```{r}
+library(fastAdaboost)
+start <- Sys.time() 
+fadab1 <- adaboost(is_canceled~., train, 10)
+end <- Sys.time() 
+start - end
+
+summary(fadab1)
+pred3 <- predict(fadab1, newdata=test, type="response")
+acc_fadab <- mean(pred3$class==test$is_canceled)
+mcc_fadab <- mcc(pred3$class, test$is_canceled)
+print(paste("accuracy=", acc_fadab))
+print(paste("mcc=", mcc_fadab))
+```
+
+### XGBoost
+```{r}
+train_label <- ifelse(train$is_canceled==1, 1, 0)
+train_matrix <- data.matrix(train[, -2])
+test_label <- ifelse(test$is_canceled==1, 1, 0)
+test_matrix <- data.matrix(test[, -2])
+
+
+library(xgboost)
+start <- Sys.time() 
+xgb1 <- xgboost(data=train_matrix, label=train_label, nrounds=100, objective="binary:logistic", verbose  = 0)
+end <- Sys.time() 
+start - end
+probs <- predict(xgb1, test_matrix)
+pred4 <- ifelse(probs>0.5, 1, 0)
+acc_xg <- mean(pred4==test_label)
+mcc_xg <- mcc(pred4, test_label)
+print(paste("accuracy=", acc_xg))
+print(paste("mcc=", mcc_xg))
+```
+
+### Discussion
+The accuracies of the original algorithms of the project, logistic regression, naive bayes, and a decision tree, were 0.807, 0.457, and 0.797 respectively. The ensemble methods used in this notebook all improved upon the highest accuracy, 0.807 by logistic regression. Here are the model ranked by accuracy: random forest (0.854), xgboost (0.839), fastadaboost (0.832), and adaboost (0.811). The mccs are also ranked the same. Random forest, though it had the highest accuracy, ran the longest at 2.852 minutes, adaboost was next at 1.412 minutes, next fastadaboost at 52.653 seconds, and finally xgboost was much ahead of everyone else at 1.305 seconds. It's interesting how xgboost was had the second highest accuracy but ran much over a hundred times faster than the random forest. Fast adaboost was actually better than adaboost both in accuracy and time.
+
+Random foresting most likely took the longest time as it trains multiple trees on subsets of the data and chose the best model after trying many of them but this also probably led to it's success. Fastadaboost uses C++ code to run about 100 times fast than adaboost, though in this case it was more about 1.3x faster, and interestingly received a slightly higher accuracy, not exactly sure why, perhaps the C++ is more powerful and accurate. Finally, XGBoost is known for its extreme scalability and ran faster by a huge margin. This is done because the C++ computation utilizes multithreading processing. Of course, the data had to be preprocessed before, however.
+
+

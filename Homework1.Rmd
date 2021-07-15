@@ -1,0 +1,116 @@
+---
+title: "Homework 1"
+author: "Ramesh Kanakala"
+output: html_notebook
+---
+### Step 1
+```{r}
+library(MASS)
+#loading data set
+data(Boston)
+str(Boston)
+```
+The Boston data set contains 506 observations describing the suburbs of Boston with 14 attributes such as per capita crime rate per town, proportion of residential land zoned for lots over 25,000 sq.ft., proportion of non-retail business acres per tow, and various others. All of the attributes are seemingly qualitative as they are numerical however 'chas', Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)., is categorical and 'rad', index of accessibility to radial highways, is ordinal. Overall, quite a small data set that seems to originally be used to assess housing values. 
+### 2
+```{r}
+#display the first few rows
+head(Boston)
+#display the last 2 rows
+tail(Boston, n = 2)
+#display row 5
+Boston[5,]
+#display the first few rows of column 1 by combining head() and indexing
+head(Boston)[1]
+#display the variable names
+names(Boston)
+```
+
+### 3
+```{r}
+#mean, median, range of the crime column
+mean(Boston$crim)
+median(Boston$crim)
+range(Boston$crim)
+```
+### 4
+```{r}
+#histogram of the crime column
+hist(Boston$crim, main = "Crime Rate in Boston", xlab = "Per Capita Crime Rate by Town", )
+```
+This histogram shows that the per capita crime rate by town is right-skewed; the mean is greater than the median. The median would be a better measure of the center of this distribution and observing that a majority of the graph is less than 10 means that the crime rate is considerably low in most of the suburbs of Boston.
+
+### 5
+```{r}
+#correlation between crime and the median house value
+cor(Boston$crim, Boston$medv)
+```
+The correlation between crime and median house value is negative meaning that as the crime rate per capita by town increases, the median housing value decreases. I would say the correlation's magnitude isn't very close to 1 but is still moderate in this context; perhaps crime rate isn't the deciding factor of housing value but certainly plays a role.
+
+### 6
+```{r}
+#plot showing the median value vs number of rooms
+plot(Boston$rm, Boston$medv, pch=20, col="blue",
+main="Rooms per Dwelling vs. Median Housing Value", xlab="Number of Rooms", ylab="Median Housing Value")
+#correlation between these two variables
+cor(Boston$rm, Boston$medv)
+```
+The graph between rooms per dwelling and the median housing value has an upward trend and closely grouped points (ignoring a few outliers) suggesting a strong positive correlation. The correlation value confirms this, being positive and quite close to 1; as the number of rooms of a dwelling increases, the median housing value increases as well most of the time.
+
+### 7
+```{r}
+is.factor(Boston$chas)
+#plot of median housing value and chas
+plot(Boston$chas, Boston$medv, pch=20, col="blue",
+main="Tract Bounding vs. Median Housing Value", xlab="Tract Bounding", ylab="Median Housing Value")
+Boston$chas <- as.factor(Boston$chas)
+#plot of median housing value and chas as factor
+plot(Boston$chas, Boston$medv, pch=20, col="blue",
+main="Tract Bounding vs. Median Housing Value", xlab="Tract Bounding", ylab="Median Housing Value")
+```
+The first plot is a scatterplot attempt to show a relationship using coordinates between 0 and 1, though there arent any for 'chas', the  wheareas the second is a boxplot is more focused on the distribution, but mostly the interquartile range, of the median housing value a 'chas' value of 0 or 1. Looking back at the description of 'chas' we can understand that 1 means tract bounds Charles River and 0 if it doesn't; looking at the boxplot can lead us to believe that tracts lining the river have a higher median housing value.
+
+### 8
+```{r}
+#rad variable
+Boston$rad
+summary(Boston$rad)
+unique(Boston$rad)
+sum(Boston$rad==24)
+#percentage of variables with rad of 24
+sum(Boston$rad==24)/sum(Boston$rad>0)
+```
+Taking a look at all the values at once allows us to see that 'rad' holds discrete, ordinal, positive integers between 1-24. Though this was possible for a smaller column of data such as 'rad', this probably wouldn't fly for larger data sets. However, observing the summary() function tells us the variable ranges between 1 and 24, it's 25th and 75th percentile, as well as it's mean and median, 5 and 9.549 respectively. The unique() function tells us a little more, that only 1, 2, 3, 4, 5, 6, 7, 8, and 24 are the only values used in this column (with duplicates of course). Using the sum() function helps us see that 132 neighborhoods have a 'rad' of 24 and dividing that by the number of all observations shows us this is a percentage of 26.08696% of all neighborhoods.
+
+### 9
+```{r}
+far <- Boston$rad
+#far is true of rad = 24
+for(i in 1:length(far)) {
+  if(far[i]==24) {
+    far[i] <- TRUE
+  } else {
+    far[i] <- FALSE
+  }
+}
+far <- as.factor(far)
+#plot of accessibility of 24 vs 1-23 and median housing value
+plot(far, Boston$medv, pch=20, col="blue", main="Accessibility vs. Median Housing Value", xlab="Accessibility (1 is least and 0 is more)", ylab="Median Housing Value")
+```
+The graph between an accessibility of 24 (1) and other (1-23) shows the distribution of median housing value for each; assuming 1 is the least accessible, it seems that 0, the neighborhoods with more accessibility, have a higher median housing value.
+
+### 10
+```{r}
+#crim
+summary(Boston$crim)
+#rm
+summary(Boston$rm)
+#lstat
+summary(Boston$lstat)
+#medv
+summary(Boston$medv)
+#neighborhood with highest median housing value
+which.max(Boston$medv)
+Boston[162, c(1, 6, 13, 14)]
+```
+Neighborhood 162, the one with the highest median housing value 50, much higher than the city average 22.53, has a lower crime rate per capita than the Boston mean crime rate, 1.46336 < 3.61352, which most likely increased it's value. It also has more rooms per dwelling than the city average, 7.489 > 6.285, which likely also contributes to its high value. Finally, the percent of "lower status population" is much lower than the city average,  1.73 < 12.65, which makes sense as this neighborhood has the highest costing dwellings and sadly perhaps having less lower status people might have attracted wealthier, higher status people to that area.
+
