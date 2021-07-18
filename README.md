@@ -1,0 +1,2 @@
+# Intro_Machine_Learning
+Assignments completed as part of an 'Introduction to Machine Learning course. Also included are extra credit assignments done for Collegium V Honors extra credit. Explores cross-validation, decision trees, neural nets, statistical tests, Bayesian learning, computational learning theory, instance-based learning, reinforcement learning, bagging, boosting, support vector machines, Hidden Markov Models, clustering, semi-supervised and unsupervised learning techniques, and more.
